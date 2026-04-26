@@ -47,7 +47,8 @@ set(sources_SRCS
 
 # Include directories for all compilers
 set(include_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/CMSIS
+    ${CMAKE_CURRENT_SOURCE_DIR}/CMSIS/Device/ST/STM32F4xx/Include
+    ${CMAKE_CURRENT_SOURCE_DIR}/CMSIS/Include
 	${CMAKE_CURRENT_SOURCE_DIR}/Inc
 )
 
@@ -57,7 +58,7 @@ set(include_cxx_DIRS)
 set(include_asm_DIRS)
 
 # Symbols definition for all compilers
-set(symbols_SYMB)
+set(symbols_SYMB STM32F446xx)
 
 # Symbols definition for each compiler
 set(symbols_c_SYMB)
