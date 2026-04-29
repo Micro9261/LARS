@@ -16,9 +16,9 @@
  ******************************************************************************
  */
 
-#include "stm32f446xx.h"
 #include <inttypes.h>
 #include <stm32f4xx.h>
+#include "usart_driver.h"
 
 int main(void)
 {
@@ -31,7 +31,7 @@ int main(void)
     //SysTick config
     SysTick->LOAD = 1600000 - 1;
     SysTick->VAL = 0;
-    SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_TICKINT_Msk | SysTick_CTRL_ENABLE_Msk;
+    SysTick->CTRL = (1UL << SysTick_CTRL_CLKSOURCE_Pos) | (1UL << SysTick_CTRL_TICKINT_Pos) | (1UL << SysTick_CTRL_ENABLE_Pos);
 
     __NVIC_EnableIRQ(SysTick_IRQn);
     

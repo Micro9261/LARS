@@ -43,6 +43,7 @@ set(cpu_PARAMS
 # Sources
 set(sources_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/main.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/usart_driver.c
 )
 
 # Include directories for all compilers
