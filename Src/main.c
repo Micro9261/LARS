@@ -30,11 +30,6 @@
 int main(void)
 {
     SystemInit();
-    //Configure GPIOA
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
-
-    //PA5 as output
-    GPIOA->MODER |= GPIO_MODER_MODER5_0;
 
     //SysTick config
     SysTick->LOAD = 16000000 - 1;
@@ -49,6 +44,9 @@ int main(void)
     //Keyboard
     keyboard_init();
 
+    //Lock
+    lock_init();
+
     while(1)
     {
         //nothing
@@ -59,7 +57,6 @@ void SysTick_Handler(void)
 {
     static uint8_t counter = 0;
     counter++;
-    GPIOA->ODR ^= GPIO_ODR_OD5; // Toggle PA5
     char * msg = "Hello, USART2!\r\n";
     if (counter % 2 == 0) // Send message every 5 seconds
     {
@@ -78,6 +75,24 @@ void SysTick_Handler(void)
         sprintf(buffer, "Key pressed: %c. Type: %s\r\n", key.key, key.long_press ? "Long" : "Short");
         msg_num = strlen(buffer);
         USART2_Send(buffer, msg_num);
+
+        if (key.key == 'A' && !key.long_press)
+        {
+            lock_open();
+        }
+        else if (key.key == 'A' && key.long_press)
+        {
+            lock_close();
+        }
+
+        if (key.key == 'D' && !key.long_press)
+        {
+            lock_block();
+        }
+        else if (key.key == 'D' && key.long_press)
+        {
+            lock_unblock();
+        }
     }
     else 
     {
