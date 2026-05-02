@@ -44,6 +44,9 @@ set(cpu_PARAMS
 set(sources_SRCS
 	${CMAKE_CURRENT_SOURCE_DIR}/Src/main.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/usart_driver.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/keyboard_driver.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/lock_driver.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/CMSIS/Device/ST/STM32F4xx/Source/Templates/system_stm32f4xx.c
 )
 
 # Include directories for all compilers

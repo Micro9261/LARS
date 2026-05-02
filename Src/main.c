@@ -15,15 +15,21 @@
  *
  ******************************************************************************
  */
+#include <stm32f4xx.h>
 
 #include <inttypes.h>
-#include <stm32f4xx.h>
-#include "stm32f446xx.h"
-#include "usart_driver.h"
 #include <string.h>
+#include <stdio.h>
+
+#include "system_stm32f4xx.h"
+#include "usart_driver.h"
+#include "keyboard_driver.h"
+#include "lock_driver.h"
+
 
 int main(void)
 {
+    SystemInit();
     //Configure GPIOA
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 
@@ -39,6 +45,9 @@ int main(void)
 
     //USART
     USART2_Init();
+
+    //Keyboard
+    keyboard_init();
 
     while(1)
     {
@@ -61,4 +70,21 @@ void SysTick_Handler(void)
     msg = "Testing Testing buffer overflow\r\n";
     msg_num = strlen(msg);
     USART2_Send(msg, msg_num);
+    key_t key = {.key = '$', .long_press = 0};
+    if ( keyboard_getchar(&key, false) )
+    {
+        // Key is available, send it over USART
+        char buffer[50];
+        sprintf(buffer, "Key pressed: %c. Type: %s\r\n", key.key, key.long_press ? "Long" : "Short");
+        msg_num = strlen(buffer);
+        USART2_Send(buffer, msg_num);
+    }
+    else 
+    {
+        // No key available, send a different message
+        char buffer[50];
+        sprintf(buffer, "No key pressed\r\n");
+        msg_num = strlen(buffer);
+        USART2_Send(buffer, msg_num);
+    }
 }

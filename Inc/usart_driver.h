@@ -3,7 +3,6 @@
 
 #include <stm32f4xx.h>
 #include <inttypes.h>
-#include <stdint.h>
 #include <string.h>
 
 #define USART2_TX_BUFFER_SIZE 200
