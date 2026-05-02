@@ -18,7 +18,9 @@
 
 #include <inttypes.h>
 #include <stm32f4xx.h>
+#include "stm32f446xx.h"
 #include "usart_driver.h"
+#include <string.h>
 
 int main(void)
 {
@@ -29,12 +31,15 @@ int main(void)
     GPIOA->MODER |= GPIO_MODER_MODER5_0;
 
     //SysTick config
-    SysTick->LOAD = 1600000 - 1;
+    SysTick->LOAD = 16000000 - 1;
     SysTick->VAL = 0;
     SysTick->CTRL = (1UL << SysTick_CTRL_CLKSOURCE_Pos) | (1UL << SysTick_CTRL_TICKINT_Pos) | (1UL << SysTick_CTRL_ENABLE_Pos);
 
     __NVIC_EnableIRQ(SysTick_IRQn);
-    
+
+    //USART
+    USART2_Init();
+
     while(1)
     {
         //nothing
@@ -43,5 +48,17 @@ int main(void)
 
 void SysTick_Handler(void)
 {
+    static uint8_t counter = 0;
+    counter++;
     GPIOA->ODR ^= GPIO_ODR_OD5; // Toggle PA5
+    char * msg = "Hello, USART2!\r\n";
+    if (counter % 2 == 0) // Send message every 5 seconds
+    {
+        msg = "Hello, USART2! This is an even message.\r\n";
+    }
+    uint8_t msg_num = strlen(msg);
+    USART2_Send(msg, msg_num);
+    msg = "Testing Testing buffer overflow\r\n";
+    msg_num = strlen(msg);
+    USART2_Send(msg, msg_num);
 }
