@@ -1,5 +1,5 @@
-#ifndef __MFRC552_H__
-#define __MFRC552_H__
+#ifndef __MFRC522_H__
+#define __MFRC522_H__
 
 
 //Command and status registers
@@ -72,4 +72,4 @@
 #define MFRC522_MFAUTHENT           0x0E
 #define MFRC522_SOFTRESET           0x0F
 
-#endif /* __MFRC552_H__ */
+#endif /* __MFRC522_H__ */

@@ -2,9 +2,8 @@
 #define __LOCK_DRIVER_H
 
 #include "stm32f4xx.h"
-#include <inttypes.h>
 
-typedef enum uint8_t{
+typedef enum {
     LOCK_STATUS_CLOSED = 0,
     LOCK_STATUS_OPEN = 1,
     LOCK_STATUS_BLOCKED = 2

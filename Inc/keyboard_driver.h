@@ -2,7 +2,6 @@
 #define __KEYBOARD_DRIVER_H
 
 #include <stm32f4xx.h>
-#include <inttypes.h>
 
 /*
 Columns: PC4, PC5, PC6, PC7 (Output)

@@ -25,6 +25,7 @@
 #include "usart_driver.h"
 #include "keyboard_driver.h"
 #include "lock_driver.h"
+#include "mfrc522_driver.h"
 
 
 int main(void)
@@ -38,14 +39,16 @@ int main(void)
 
     __NVIC_EnableIRQ(SysTick_IRQn);
 
-    //USART
+    //Init components
     USART2_Init();
-
-    //Keyboard
-    keyboard_init();
-
-    //Lock
     lock_init();
+    keyboard_init();
+    // mfrc522_init();
+
+    char buffer[50];
+    sprintf(buffer, "MFRC522 Version: 0x%02X\r\n", mfrc522_version());
+    uint8_t msg_num = strlen(buffer);
+    USART2_Send(buffer, msg_num);
 
     while(1)
     {
