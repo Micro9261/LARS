@@ -72,4 +72,19 @@
 #define MFRC522_MFAUTHENT           0x0E
 #define MFRC522_SOFTRESET           0x0F
 
+// Mifare_One card command word
+# define MFRC522_PICC_REQIDL          0x26               // find the antenna area does not enter hibernation
+# define MFRC522_PICC_REQALL          0x52               // find all the cards antenna area
+# define MFRC522_PICC_ANTICOLL        0x93               // anti-collision
+# define MFRC522_PICC_SElECTTAG       0x93               // election card
+# define MFRC522_PICC_AUTHENT1A       0x60               // authentication key A
+# define MFRC522_PICC_AUTHENT1B       0x61               // authentication key B
+# define MFRC522_PICC_READ            0x30               // Read Block
+# define MFRC522_PICC_WRITE           0xA0               // write block
+# define MFRC522_PICC_DECREMENT       0xC0               // debit
+# define MFRC522_PICC_INCREMENT       0xC1               // recharge
+# define MFRC522_PICC_RESTORE         0xC2               // transfer block data to the buffer
+# define MFRC522_PICC_TRANSFER        0xB0               // save the data in the buffer
+# define MFRC522_PICC_HALT            0x50               // Sleep
+
 #endif /* __MFRC522_H__ */
