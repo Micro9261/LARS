@@ -6,6 +6,8 @@
 #define MAX_LEN 16
 
 static volatile uint16_t tick_cnt = 0;
+static uint8_t cardstr[17] = {0};
+
 
 static void spi_slave_select(void)
 {
@@ -148,7 +150,7 @@ void mfrc522_init()
     RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
 
     //SPI2 configuration: Master mode, 8-bit data, CPOL=0, CPHA=0, MSB first, baud rate = fPCLK/2
-    SPI2->CR1 = SPI_CR1_MSTR | (0x01 << SPI_CR1_BR_Pos); // Master mode, software slave management, baud rate fPCLK/2
+    SPI2->CR1 = SPI_CR1_MSTR; // Master mode, software slave management, baud rate fPCLK/2
     SPI2->CR2 = SPI_CR2_SSOE; // Enable SS output for master mode
     SPI2->CR1 |= SPI_CR1_SPE; // Enable SPI2
 
@@ -503,4 +505,27 @@ void TIM2_IRQHandler(void)
         TIM2->SR &= ~TIM_SR_UIF; // Clear interrupt flag
         tick_cnt++; // Increment tick counter
     }
+}
+
+uint8_t mfrc522_card_present(void)
+{
+    uint8_t status = MFRC522_ERR;
+    status = mfrc522_request(MFRC522_PICC_REQIDL, cardstr);
+    return status;
+}
+
+uint8_t mfrc522_get_card_uid(uint8_t * uid, uint8_t * uid_len)
+{
+    uint8_t status = MFRC522_ERR;
+    status = mfrc522_anticoll(cardstr);
+    if (status == MFRC522_OK)
+    {
+        for (uint8_t i = 0; i < 5; i++)
+        {
+            uid[i] = cardstr[i];
+        }
+        *uid_len = 5;
+    }
+    mfrc522_halt();
+    return status;
 }

@@ -7,7 +7,7 @@
 #define SCANNED (0x3)
 
 
-static const char key_map[4][4] = {
+static const uint8_t key_map[4][4] = {
     {'1', '2', '3', 'A'},
     {'4', '5', '6', 'B'},
     {'7', '8', '9', 'C'},
@@ -94,7 +94,7 @@ uint8_t keyboard_get(char * buffer, uint8_t input_size, char terminator)
 {
     uint8_t count = 0;
     key_t key;
-    while (count < input_size - 1 && keyboard_getchar(&key, true))
+    while (count < input_size && keyboard_getchar(&key, true))
     {
         buffer[count++] = key.key;
         if (key.key == terminator)

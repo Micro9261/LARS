@@ -15,6 +15,7 @@
  *
  ******************************************************************************
  */
+#include <stdint.h>
 #include <stm32f4xx.h>
 
 #include <inttypes.h>
@@ -22,233 +23,339 @@
 #include <stdio.h>
 
 #include "MFRC522.h"
+#include "stm32f446xx.h"
 #include "system_stm32f4xx.h"
 #include "usart_driver.h"
 #include "keyboard_driver.h"
 #include "lock_driver.h"
 #include "mfrc522_driver.h"
+#include "password_manager.h"
 
- // a private key to scramble data writing/reading to/from RFID card:
-// static uint8_t Mx1[7][5]={
-// {0x01,0x01,0x01,0x01},
-// {0x02,0x02,0x02,0x02},
-// {0x03,0x03,0x03,0x03},
-// {0x04,0x04,0x04,0x04},
-// {0x05,0x05,0x05,0x05},
-// {0x06,0x06,0x06,0x06}
-// };
+#define MAX_CHECKS 10
 
-static uint8_t Mx1[7][5]={{0x12,0x45,0xF2,0xA8},{0xB2,0x6C,0x39,0x83},{0x55,0xE5,0xDA,0x18},
-		  	  	  	{0x1F,0x09,0xCA,0x75},{0x99,0xA2,0x50,0xEC},{0x2C,0x88,0x7F,0x3D}};
+/****************** FUNCTIONS ***********************/
+void delay_ms(uint16_t ms);
+void delay_us(uint8_t us);
+void add_card(uint8_t type);
+void remove_card(void);
+void read_password(uint8_t * input, uint8_t * max_len, uint8_t block);
+void change_password(uint8_t type);
+void admin_menu(void);
+void user_menu(void);
+
 
 int main(void)
 {
     SystemInit();
-
-    //SysTick config
-    SysTick->LOAD = 16000000 - 1;
-    SysTick->VAL = 0;
-    SysTick->CTRL = (1UL << SysTick_CTRL_CLKSOURCE_Pos) | (1UL << SysTick_CTRL_TICKINT_Pos) | (1UL << SysTick_CTRL_ENABLE_Pos);
-
-    __NVIC_EnableIRQ(SysTick_IRQn);
 
     //Init components
     USART2_Init();
     lock_init();
     keyboard_init();
     mfrc522_init();
+    pass_manager_init();
 
     char buffer[50];
     sprintf(buffer, "MFRC522 Version: 0x%02X\r\n", mfrc522_version());
     uint8_t msg_num = strlen(buffer);
     USART2_Send(buffer, msg_num);
-
     while(1)
     {
-        //nothing
-    }
-}
-
-void SysTick_Handler(void)
-{
-    static uint8_t counter = 0;
-    counter++;
-    /*
-    char * msg = "Hello, USART2!\r\n";
-    if (counter % 2 == 0) // Send message every 5 seconds
-    {
-        msg = "Hello, USART2! This is an even message.\r\n";
-    }
-    uint8_t msg_num = strlen(msg);
-    USART2_Send(msg, msg_num);
-    msg = "Testing Testing buffer overflow\r\n";
-    msg_num = strlen(msg);
-    USART2_Send(msg, msg_num);
-    key_t key = {.key = '$', .long_press = 0};
-    if ( keyboard_getchar(&key, false) )
-    {
-        // Key is available, send it over USART
-        char buffer[50];
-        sprintf(buffer, "Key pressed: %c. Type: %s\r\n", key.key, key.long_press ? "Long" : "Short");
-        msg_num = strlen(buffer);
-        USART2_Send(buffer, msg_num);
-
-        if (key.key == 'A' && !key.long_press)
+        if (!keyboard_empty())
         {
-            lock_open();
-        }
-        else if (key.key == 'A' && key.long_press)
-        {
-            lock_close();
-        }
+            uint8_t input[MAX_PASSWORD_LEN] = {0};
+            uint8_t in_cnt = MAX_PASSWORD_LEN;
 
-        if (key.key == 'D' && !key.long_press)
-        {
-            lock_block();
-        }
-        else if (key.key == 'D' && key.long_press)
-        {
-            lock_unblock();
-        }
-    }
-    else 
-    {
-        // No key available, send a different message
-        char buffer[50];
-        sprintf(buffer, "No key pressed\r\n");
-        msg_num = strlen(buffer);
-        USART2_Send(buffer, msg_num);
-    }
-    */
-    uint8_t msg_num;
-    //Card test
-    uint8_t cardstr[17] = {0};
-    uint8_t status = MFRC522_ERR;
-    status = mfrc522_request(MFRC522_PICC_REQIDL, cardstr);
-    if (status == MFRC522_OK)
-    {
-        char buffer[50];
-        sprintf(buffer, "Card talking! Card:%x,%x,%x\r\n", cardstr[0], cardstr[1], cardstr[2]);
-        msg_num = strlen(buffer);
-        USART2_Send(buffer, msg_num);
+            read_password(input, &in_cnt, false);
 
-        status = mfrc522_anticoll(cardstr);
-        if (status == MFRC522_OK)
-        {
-            char UID[5];
-            sprintf(buffer, "Card UID: %x %x %x %x\r\n", cardstr[0], cardstr[1], cardstr[2], cardstr[3]);
-            UID[0] = cardstr[0];
-            UID[1] = cardstr[1];
-            UID[2] = cardstr[2];
-            UID[3] = cardstr[3];
-            UID[4] = cardstr[4];
-            msg_num = strlen(buffer);
-            USART2_Send(buffer, msg_num);
-
-            status = mfrc522_select_tag(cardstr);
-            if (status > 0)
+            if (in_cnt != 0)
             {
-                uint8_t SectorKey[7];
-                SectorKey[0] = ((Mx1[0][0])^(UID[0])) + ((Mx1[0][1])^(UID[1])) + ((Mx1[0][2])^(UID[2])) + ((Mx1[0][3])^(UID[3]));// 0x11; //KeyA[0]
-                SectorKey[1] = ((Mx1[1][0])^(UID[0])) + ((Mx1[1][1])^(UID[1])) + ((Mx1[1][2])^(UID[2])) + ((Mx1[1][3])^(UID[3]));// 0x11; //KeyA[0]
-                SectorKey[2] = ((Mx1[2][0])^(UID[0])) + ((Mx1[2][1])^(UID[1])) + ((Mx1[2][2])^(UID[2])) + ((Mx1[2][3])^(UID[3]));// 0x11; //KeyA[0]
-                SectorKey[3] = ((Mx1[3][0])^(UID[0])) + ((Mx1[3][1])^(UID[1])) + ((Mx1[3][2])^(UID[2])) + ((Mx1[3][3])^(UID[3]));// 0x11; //KeyA[0]
-                SectorKey[4] = ((Mx1[4][0])^(UID[0])) + ((Mx1[4][1])^(UID[1])) + ((Mx1[4][2])^(UID[2])) + ((Mx1[4][3])^(UID[3]));// 0x11; //KeyA[0]
-                SectorKey[5] = ((Mx1[5][0])^(UID[0])) + ((Mx1[5][1])^(UID[1])) + ((Mx1[5][2])^(UID[2])) + ((Mx1[5][3])^(UID[3]));// 0x11; //KeyA[0]
-
-                status = mfrc522_auth(0x60, 3, SectorKey, cardstr);
-                if (status == MFRC522_OK)
+                if (pass_manager_check_password(input, in_cnt, PASSWORD_ADMIN) == PASSWORD_OK)
                 {
-                    
-                    const char * msg = "Auth. OK\r\n";
-                    msg_num = strlen(buffer);
-                    USART2_Send(msg, msg_num);
-                    uint8_t card_data[17];
-                    card_data[0] = 0xFF;
-                    card_data[1] = 0xFF;
-                    card_data[2] = 0xFF;
-                    card_data[3] = 0xFF;
-                    card_data[4] = 0xFF;
-                    card_data[5] = 0xFF;
-                    card_data[6] = 0xFF; //Access_bits[6]
-                    card_data[7] = 0x07; //Access_bits[7]
-                    card_data[8] = 0x80; //Access_bits[8]
-                    card_data[9] = 0x88; //user_byte[9]
-                    card_data[10] = 0x88; //user_byte[10]
-                    card_data[11] = 0x88; //user_byte[11]
-                    card_data[12] = 0x88; //user_byte[12]
-                    card_data[13] = 0x88; //user_byte[13]
-                    card_data[14] = 0x88; //user_byte[14]
-                    card_data[15] = 0x88; //user_byte[15]
-                    status = mfrc522_write(3, card_data);
-                    if (status == MFRC522_OK)
-                    {
-                        const char * msg2 = "Card Cleared!\r\n";
-                        msg_num = strlen(buffer);
-                        USART2_Send(msg2, msg_num);
-                    }
-
+                    admin_menu();
                 }
-                else
+                else if (pass_manager_check_password(input, in_cnt, PASSWORD_USER) == PASSWORD_OK)
                 {
-                    for (uint8_t i = 0; i < 16; i++)
-                    {
-                        cardstr[i] = 0x0;
-                    }
-
-                    status = 0;
-                    status = mfrc522_request(MFRC522_PICC_REQIDL, cardstr);
-                    status = mfrc522_anticoll(cardstr);
-                    status = mfrc522_select_tag(cardstr);
-                    SectorKey[0] = 0xFF;
-                    SectorKey[1] = 0xFF;
-                    SectorKey[2] = 0xFF;
-                    SectorKey[3] = 0xFF;
-                    SectorKey[4] = 0xFF;
-                    SectorKey[5] = 0xFF;
-
-                    status = mfrc522_auth(0x60, 3, SectorKey, cardstr);
-                    if (status == MFRC522_OK)
-                    {
-                        const char * msg = "Auth. OK. New card!\r\n";
-                        msg_num = strlen(buffer);
-                        USART2_Send(msg, msg_num);
-                        uint8_t card_data[17];
-                        card_data[0] = ((Mx1[0][0])^(UID[0])) + ((Mx1[0][1])^(UID[1])) + ((Mx1[0][2])^(UID[2])) + ((Mx1[0][3])^(UID[3]));// 0x11; //KeyA[0]
-                        card_data[1] = ((Mx1[1][0])^(UID[0])) + ((Mx1[1][1])^(UID[1])) + ((Mx1[1][2])^(UID[2])) + ((Mx1[1][3])^(UID[3]));// 0x11; //KeyA[0]
-                        card_data[2] = ((Mx1[2][0])^(UID[0])) + ((Mx1[2][1])^(UID[1])) + ((Mx1[2][2])^(UID[2])) + ((Mx1[2][3])^(UID[3]));// 0x11; //KeyA[0]
-                        card_data[3] = ((Mx1[3][0])^(UID[0])) + ((Mx1[3][1])^(UID[1])) + ((Mx1[3][2])^(UID[2])) + ((Mx1[3][3])^(UID[3]));// 0x11; //KeyA[0]
-                        card_data[4] = ((Mx1[4][0])^(UID[0])) + ((Mx1[4][1])^(UID[1])) + ((Mx1[4][2])^(UID[2])) + ((Mx1[4][3])^(UID[3]));// 0x11; //KeyA[0]
-                        card_data[5] = ((Mx1[5][0])^(UID[0])) + ((Mx1[5][1])^(UID[1])) + ((Mx1[5][2])^(UID[2])) + ((Mx1[5][3])^(UID[3]));// 0x11; //KeyA[0]
-                        card_data[6] = 0xFF; //Access_bits[6]
-                        card_data[7] = 0x07; //Access_bits[7]
-                        card_data[8] = 0x80; //Access_bits[8]
-                        card_data[9] = 0x88; //user_byte[9]
-                        card_data[10] = 0x88; //user_byte[10]
-                        card_data[11] = 0x88; //user_byte[11]
-                        card_data[12] = 0x88; //user_byte[12]
-                        card_data[13] = 0x88; //user_byte[13]
-                        card_data[14] = 0x88; //user_byte[14]
-                        card_data[15] = 0x88; //user_byte[15]
-
-                        status = mfrc522_write(3, card_data);
-                        if (status == MFRC522_OK)
-                        {
-                            const char * msg2 = "Card Set!\r\n";
-                            msg_num = strlen(msg2);
-                            USART2_Send(msg2, msg_num);
-                        }
-                    }
-                    else if (status != MFRC522_OK)
-                    {
-                        const char * msg = "Auth. BAD. New card!\r\n";
-                        msg_num = strlen(buffer);
-                        USART2_Send(msg, msg_num);
-                    }
-                    mfrc522_stop_crypto1();
+                    user_menu();
                 }
             }
         }
-        mfrc522_halt();
+
+        if (mfrc522_card_present() == MFRC522_OK)
+        {
+            uint8_t uid[5] = {0};
+            uint8_t uid_len = 0;
+            if (mfrc522_get_card_uid(uid,  &uid_len) == MFRC522_OK)
+            {
+                char buffer[50];
+                sprintf(buffer, "CARD UID: %x %x %x %x %x\r\n", uid[0], uid[1], uid[2], uid[3], uid[4]);
+                uint8_t msg_len = strlen(buffer);
+                USART2_Send(buffer, msg_len);
+
+                if (pass_manager_check_card(uid, uid_len, UID_TYPE_ADMIN) == CARD_OK)
+                {
+                    admin_menu();
+                }
+                else if (pass_manager_check_card(uid, uid_len, UID_TYPE_USER) == CARD_OK)
+                {
+                    user_menu();
+                }
+            }
+        }
     }
+}
+
+
+void delay_ms(uint16_t ms)
+{
+    //SysTick config
+    SysTick->LOAD = 16000 - 1;
+    SysTick->VAL = 0;
+    SysTick->CTRL = (1UL << SysTick_CTRL_CLKSOURCE_Pos) | (1UL << SysTick_CTRL_ENABLE_Pos);
+
+    for (uint16_t i = 0; i < ms; i++)
+    {
+        while ( !(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) );
+    }
+
+    SysTick->CTRL = 0;
+}
+
+void delay_us(uint8_t us)
+{
+    //SysTick config
+    SysTick->LOAD = 16 - 1;
+    SysTick->VAL = 0;
+    SysTick->CTRL = (1UL << SysTick_CTRL_CLKSOURCE_Pos) | (1UL << SysTick_CTRL_ENABLE_Pos);
+
+    for (uint16_t i = 0; i < us; i++)
+    {
+        while ( !(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) );
+    }
+    SysTick->CTRL = 0;
+}
+
+void add_card(uint8_t type)
+{
+    const char * msg = "Add Card!\r\n";
+    uint8_t msg_len = strlen(msg);
+    USART2_Send(msg, msg_len);
+
+    key_t key = {.key = '\0', .long_press = 0};
+    uint8_t card_status = mfrc522_card_present();
+    while (card_status != MFRC522_OK) {
+        if (keyboard_getchar(&key, false))
+        {
+            if (key.key == '0')
+            {
+                break;
+            }
+        }
+        card_status = mfrc522_card_present();
+    }
+
+    if (card_status == MFRC522_OK)
+    {
+        uint8_t uid[5] = {0};
+        uint8_t uid_len = 0;
+        if (mfrc522_get_card_uid(uid,  &uid_len) == MFRC522_OK)
+        {
+            char buffer[50];
+            sprintf(buffer, "Adding CARD UID: %x %x %x %x %x\r\n", uid[0], uid[1], uid[2], uid[3], uid[4]);
+            uint8_t msg_len = strlen(buffer);
+            USART2_Send(buffer, msg_len);
+
+            if (pass_manager_add_card(uid, uid_len, type) == CARD_OK)
+            {
+                sprintf(buffer,"Card add success!\r\n");
+                msg_len = strlen(buffer);
+                USART2_Send(buffer, msg_len);
+            }
+            else
+            {
+                sprintf(buffer,"Card add failed!\r\n");
+                msg_len = strlen(buffer);
+                USART2_Send(buffer, msg_len);
+            }
+        }
+    }
+}
+
+void remove_card(void)
+{
+    const char * msg = "Remove Card!\r\n";
+    uint8_t msg_len = strlen(msg);
+    USART2_Send(msg, msg_len);
+
+    key_t key = {.key = '\0', .long_press = 0};
+    uint8_t card_status = mfrc522_card_present();
+    while (card_status != MFRC522_OK) {
+        if (keyboard_getchar(&key, false))
+        {
+            if (key.key == '0')
+            {
+                break;
+            }
+        }
+        card_status = mfrc522_card_present();
+    }
+
+    if (card_status == MFRC522_OK)
+    {
+        uint8_t uid[5] = {0};
+        uint8_t uid_len = 0;
+        if (mfrc522_get_card_uid(uid,  &uid_len) == MFRC522_OK)
+        {
+            char buffer[50];
+            sprintf(buffer, "Removing CARD UID: %x %x %x %x %x\r\n", uid[0], uid[1], uid[2], uid[3], uid[4]);
+            uint8_t msg_len = strlen(buffer);
+            USART2_Send(buffer, msg_len);
+
+            if (pass_manager_remove_card(uid, uid_len) == CARD_OK)
+            {
+                sprintf(buffer,"Card remove success!\r\n");
+                msg_len = strlen(buffer);
+                USART2_Send(buffer, msg_len);
+            }
+            else
+            {
+                sprintf(buffer,"Card remove failed!\r\n");
+                msg_len = strlen(buffer);
+                USART2_Send(buffer, msg_len);
+            }
+        }
+    }
+}
+
+void read_password(uint8_t * input, uint8_t * max_len, uint8_t block)
+{
+    *max_len = 0;
+
+    key_t key = {.key = '\0', .long_press = 0};
+    for (uint8_t checks = 0; checks < MAX_CHECKS; checks++)
+    {
+        if (keyboard_getchar(&key, block))
+        {
+            if (key.key == '#')
+            {
+                break;
+            }
+
+            input[*max_len] = key.key;
+            *max_len = *max_len + 1;
+            if (*max_len >= MAX_PASSWORD_LEN)
+            {
+                break;
+            }
+        }
+        delay_ms(500);
+    }
+}
+
+void change_password(uint8_t type)
+{
+    const char * pass_type = "";
+    if (type == PASSWORD_ADMIN)
+    {
+        pass_type = "[admin]";
+    }
+    else if (type == PASSWORD_USER)
+    {
+        pass_type = "[user]";
+    }
+    else
+    {
+        return;
+    }
+
+    char buffer[50];
+    sprintf(buffer, "Change password! %s\r\n", pass_type);
+    uint8_t msg_len = strlen(buffer);
+    USART2_Send(buffer, msg_len);
+
+    uint8_t input[MAX_PASSWORD_LEN] = {0};
+    uint8_t in_cnt = MAX_PASSWORD_LEN;
+
+    read_password(input, &in_cnt, true);
+
+    if (pass_manager_set_password(input, in_cnt, type) == PASSWORD_OK)
+    {
+        sprintf(buffer, "Password for %s change success!\r\n", pass_type);
+        msg_len = strlen(buffer);
+        USART2_Send(buffer, msg_len);
+    }
+    else
+    {
+        sprintf(buffer, "Password for %s change failed!\r\n", pass_type);
+        msg_len = strlen(buffer);
+        USART2_Send(buffer, msg_len);
+    }
+}
+
+void admin_menu(void)
+{
+    const char * msg = "Admin actions!\r\n";
+    uint8_t msg_len = strlen(msg);
+    USART2_Send(msg, msg_len);
+
+    key_t key = {.key = '\0', .long_press = 0};
+    while (1)
+    {
+        if (keyboard_getchar(&key, false))
+        {
+            uint8_t exit_menu = false;
+            switch (key.key) {
+                case '1':
+                    add_card(UID_TYPE_USER);
+                    break;
+
+                case '2':
+                    add_card(UID_TYPE_ADMIN);
+                    break;
+                
+                case '3':
+                    remove_card();
+                    break;
+                
+                case 'A':
+                    change_password(PASSWORD_USER);
+                    break;
+
+                case  'B':
+                    change_password(PASSWORD_ADMIN);
+                    break;
+
+                case '0':
+                    exit_menu = true;
+                    break;
+
+                default:
+                    break;
+            }
+
+            if (exit_menu == true)
+            {
+                break;
+            }
+        }
+    }
+
+    msg = "Admin actions end!\r\n";
+    msg_len = strlen(msg);
+    USART2_Send(msg, msg_len);
+}
+
+void user_menu(void)
+{
+    const char * msg = "User actions!\r\n";
+    uint8_t msg_len = strlen(msg);
+    USART2_Send(msg, msg_len);
+
+    lock_open();
+    delay_ms(3000);
+    lock_close();
+
+    msg = "User actions end!\r\n";
+    msg_len = strlen(msg);
+    USART2_Send(msg, msg_len);
 }

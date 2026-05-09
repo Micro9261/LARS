@@ -23,7 +23,7 @@ PC3     | *   | 0   | #   | D
 #define false 0
 
 typedef struct {
-    char key;
+    uint8_t key;
     uint8_t long_press;
 } key_t;
 

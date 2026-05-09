@@ -19,6 +19,9 @@ IRQ  -> PB1
 TIM2 for delays and timeouts
 */
 
+uint8_t mfrc522_card_present(void);
+uint8_t mfrc522_get_card_uid(uint8_t * uid, uint8_t * uid_len);
+
 void mfrc522_init(void);
 void mfrc522_antenna_on(void);
 void mfrc522_antenna_off(void);
