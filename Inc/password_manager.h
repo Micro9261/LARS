@@ -13,6 +13,7 @@
 //Password types
 #define PASSWORD_ADMIN 0
 #define PASSWORD_USER 1
+#define PASSWORD_UNKOWN 2
 
 //Card UIDs
 #define UID_LEN 5

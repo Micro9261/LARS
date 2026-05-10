@@ -40,7 +40,7 @@ void delay_ms(uint16_t ms);
 void delay_us(uint8_t us);
 void add_card(uint8_t type);
 void remove_card(void);
-void read_password(uint8_t * input, uint8_t * max_len, uint8_t block);
+void read_password(uint8_t * input, uint8_t * max_len, uint8_t block, uint8_t type);
 void change_password(uint8_t type);
 void admin_menu(void);
 void user_menu(void);
@@ -51,6 +51,8 @@ void user_menu(void);
 #define DISPLAY_CARD_REMOVED 2
 #define DISPLAY_CARD_ERR 3
 #define DISPLAY_CARD_BAD 4
+#define DISPLAY_PASSWORD_SAVED 5
+#define DISPLAY_PASSWORD_ERR 6
 
 #define DISPLAY_PASSWORD_GUESS 0
 #define DISPLAY_PASSWORD_ADMIN 1
@@ -60,7 +62,7 @@ void display_logo(void);
 void display_lock_status(uint8_t open);
 void display_admin_mode(uint8_t admin);
 void display_blocked(uint8_t blocked);
-void display_card_notification(uint8_t type);
+void display_notification(uint8_t type);
 void display_password(uint8_t digits, uint8_t type);
 void clear_info_section(void);
 
@@ -75,7 +77,7 @@ int main(void)
     keyboard_init();
     mfrc522_init();
     pass_manager_init();
-    lock_init();
+    ST7735_Init();
     led_init();
 
     char buffer[50];
@@ -83,6 +85,10 @@ int main(void)
     uint8_t msg_num = strlen(buffer);
     USART2_Send(buffer, msg_num);
     ST7735_FillScreen(ST7735_WHITE);
+    display_logo();
+    display_lock_status(false);
+    led_turn_on(LED_RED);
+    led_turn_off(LED_GREEN);
     while(1)
     {
         if (!keyboard_empty())
@@ -90,8 +96,8 @@ int main(void)
             uint8_t input[MAX_PASSWORD_LEN] = {0};
             uint8_t in_cnt = MAX_PASSWORD_LEN;
 
-            read_password(input, &in_cnt, false);
-
+            read_password(input, &in_cnt, false, PASSWORD_UNKOWN);
+            clear_info_section();
             if (in_cnt != 0)
             {
                 if (pass_manager_check_password(input, in_cnt, PASSWORD_ADMIN) == PASSWORD_OK)
@@ -161,6 +167,7 @@ void delay_us(uint8_t us)
 
 void add_card(uint8_t type)
 {
+    display_notification(DISPLAY_CARD_SCAN);
     const char * msg = "Add Card!\r\n";
     uint8_t msg_len = strlen(msg);
     USART2_Send(msg, msg_len);
@@ -191,15 +198,22 @@ void add_card(uint8_t type)
 
             if (pass_manager_add_card(uid, uid_len, type) == CARD_OK)
             {
+                display_notification(DISPLAY_CARD_ADDED);
+                led_turn_on(LED_GREEN);
                 sprintf(buffer,"Card add success!\r\n");
                 msg_len = strlen(buffer);
                 USART2_Send(buffer, msg_len);
+                delay_ms(1000);
+                led_turn_off(LED_GREEN);
             }
             else
             {
+                led_play_pattern(LED_RED);
+                display_notification(DISPLAY_CARD_ERR);
                 sprintf(buffer,"Card add failed!\r\n");
                 msg_len = strlen(buffer);
                 USART2_Send(buffer, msg_len);
+                delay_ms(1000);
             }
         }
     }
@@ -207,6 +221,7 @@ void add_card(uint8_t type)
 
 void remove_card(void)
 {
+    display_notification(DISPLAY_CARD_SCAN);
     const char * msg = "Remove Card!\r\n";
     uint8_t msg_len = strlen(msg);
     USART2_Send(msg, msg_len);
@@ -237,24 +252,44 @@ void remove_card(void)
 
             if (pass_manager_remove_card(uid, uid_len) == CARD_OK)
             {
+                led_turn_on(LED_GREEN);
+                display_notification(DISPLAY_CARD_REMOVED);
                 sprintf(buffer,"Card remove success!\r\n");
                 msg_len = strlen(buffer);
                 USART2_Send(buffer, msg_len);
+                delay_ms(1000);
+                led_turn_off(LED_GREEN);
             }
             else
             {
+                led_play_pattern(LED_RED);
+                display_notification(DISPLAY_CARD_ERR);
                 sprintf(buffer,"Card remove failed!\r\n");
                 msg_len = strlen(buffer);
                 USART2_Send(buffer, msg_len);
+                delay_ms(1000);
             }
         }
     }
 }
 
-void read_password(uint8_t * input, uint8_t * max_len, uint8_t block)
+void read_password(uint8_t * input, uint8_t * max_len, uint8_t block, uint8_t type)
 {
     *max_len = 0;
+    switch (type) 
+    {
+        case PASSWORD_ADMIN:
+            display_password(0, DISPLAY_PASSWORD_ADMIN);
+            break;
+        
+        case PASSWORD_USER:
+            display_password(0, DISPLAY_PASSWORD_USER);
+            break;
 
+        default:
+            display_password(0, DISPLAY_PASSWORD_GUESS);
+            break;
+    }
     key_t key = {.key = '\0', .long_press = 0};
     for (uint8_t checks = 0; checks < MAX_CHECKS; checks++)
     {
@@ -267,6 +302,20 @@ void read_password(uint8_t * input, uint8_t * max_len, uint8_t block)
 
             input[*max_len] = key.key;
             *max_len = *max_len + 1;
+            switch (type) 
+            {
+                case PASSWORD_ADMIN:
+                    display_password(*max_len, DISPLAY_PASSWORD_ADMIN);
+                    break;
+                
+                case PASSWORD_USER:
+                    display_password(*max_len, DISPLAY_PASSWORD_USER);
+                    break;
+
+                default:
+                    display_password(*max_len, DISPLAY_PASSWORD_GUESS);
+                    break;
+            }
             if (*max_len >= MAX_PASSWORD_LEN)
             {
                 break;
@@ -300,24 +349,32 @@ void change_password(uint8_t type)
     uint8_t input[MAX_PASSWORD_LEN] = {0};
     uint8_t in_cnt = MAX_PASSWORD_LEN;
 
-    read_password(input, &in_cnt, true);
+    read_password(input, &in_cnt, true, type);
 
     if (pass_manager_set_password(input, in_cnt, type) == PASSWORD_OK)
     {
+        led_turn_on(LED_GREEN);
+        display_notification(DISPLAY_PASSWORD_SAVED);
         sprintf(buffer, "Password for %s change success!\r\n", pass_type);
         msg_len = strlen(buffer);
         USART2_Send(buffer, msg_len);
+        delay_ms(1000);
+        led_turn_off(LED_GREEN);
     }
     else
     {
+        led_play_pattern(LED_RED);
+        display_notification(DISPLAY_PASSWORD_ERR);
         sprintf(buffer, "Password for %s change failed!\r\n", pass_type);
         msg_len = strlen(buffer);
         USART2_Send(buffer, msg_len);
+        delay_ms(1000);
     }
 }
 
 void admin_menu(void)
 {
+    display_admin_mode(true);
     const char * msg = "Admin actions!\r\n";
     uint8_t msg_len = strlen(msg);
     USART2_Send(msg, msg_len);
@@ -348,6 +405,27 @@ void admin_menu(void)
                 case  'B':
                     change_password(PASSWORD_ADMIN);
                     break;
+                
+                case '7':
+                    lock_block();
+                    if (LOCK_STATUS_BLOCKED == get_lock_status())
+                    {
+                        display_blocked(true);
+                    }
+                    break;
+
+                case '9':
+                    lock_unblock();
+                    if (LOCK_STATUS_BLOCKED != get_lock_status())
+                    {
+                        display_blocked(false);
+                    }
+                    break;
+
+                case '#':
+                    user_menu();
+                    exit_menu = true;
+                    break;
 
                 case '0':
                     exit_menu = true;
@@ -362,11 +440,13 @@ void admin_menu(void)
                 break;
             }
         }
+        clear_info_section();
     }
 
     msg = "Admin actions end!\r\n";
     msg_len = strlen(msg);
     USART2_Send(msg, msg_len);
+    display_admin_mode(false);
 }
 
 void user_menu(void)
@@ -376,8 +456,21 @@ void user_menu(void)
     USART2_Send(msg, msg_len);
 
     lock_open();
-    delay_ms(3000);
+    if (LOCK_STATUS_OPEN == get_lock_status())
+    {
+        led_turn_off(LED_RED);
+        led_play_pattern(LED_GREEN);
+        display_lock_status(true);
+    }
+
+    delay_ms(1000);
+
     lock_close();
+    if (LOCK_STATUS_CLOSED == get_lock_status())
+    {
+        led_turn_on(LED_RED);
+        display_lock_status(false);
+    }
 
     msg = "User actions end!\r\n";
     msg_len = strlen(msg);
@@ -392,7 +485,7 @@ void display_logo(void)
 
 void display_lock_status(uint8_t open)
 {
-    ST7735_FillRectangle(47, 2*26 + 4, 52 + 6* 11, 2*26 + 4 + 18, uint16_t color);
+    ST7735_FillRectangle(47, 2*26 + 4, 52 + 6* 11, 2*26 + 4 + 18, ST7735_WHITE);
     if (open == true)
     {
         ST7735_WriteString(47 + 11, 2*26 + 4, "OPEN", Font_11x18, ST7735_GREEN, ST7735_WHITE);
@@ -427,14 +520,87 @@ void display_blocked(uint8_t blocked)
     }
 }
 
-void display_card_notification(uint8_t type)
+void display_notification(uint8_t type)
 {
-    
+    clear_info_section();
+    switch (type) 
+    {
+        case DISPLAY_CARD_SCAN:
+            ST7735_WriteString(0, 2*26 + 4 + 24, "Card scan...", Font_7x10,ST7735_BLACK, ST7735_WHITE);
+            break;
+        
+        case DISPLAY_CARD_ADDED:
+            ST7735_WriteString(0, 2*26 + 4 + 24, "Card added!", Font_7x10, ST7735_BLACK, ST7735_WHITE);
+            break;
+
+        case DISPLAY_CARD_REMOVED:
+            ST7735_WriteString(0, 2*26 + 4 + 24, "Card removed!", Font_7x10, ST7735_BLACK, ST7735_WHITE);
+            break;
+
+        case DISPLAY_CARD_ERR:
+            ST7735_WriteString(0, 2*26 + 4 + 24, "Card error!", Font_7x10, ST7735_BLACK, ST7735_WHITE);
+            break;
+
+        case DISPLAY_CARD_BAD:
+            ST7735_WriteString(0, 2*26 + 4 + 24, "Card wrong!", Font_7x10, ST7735_BLACK, ST7735_WHITE);
+            break;
+
+        case DISPLAY_PASSWORD_SAVED:
+            ST7735_WriteString(0, 2*26 + 4 + 24, "PASS changed!", Font_7x10, ST7735_BLACK, ST7735_WHITE);
+            break;
+
+        case DISPLAY_PASSWORD_ERR:
+            ST7735_WriteString(0, 2*26 + 4 + 24, "PASS error!", Font_7x10, ST7735_BLACK, ST7735_WHITE);
+            break;
+
+        default:
+            break;
+    }
 }
 
 void display_password(uint8_t digits, uint8_t type)
 {
+    clear_info_section();
+    char buffer[MAX_PASSWORD_LEN + 10 + 1];
+    uint8_t msg_len;
+    switch (type) 
+    {
+        case DISPLAY_PASSWORD_GUESS:
+            msg_len = 5;
+            strncpy(buffer, "PASS:",msg_len);
+            while (digits--)
+            {
+                buffer[msg_len++] = '*';
+            }
+            buffer[msg_len] = '\0';
+            ST7735_WriteString(0, 2*26 + 4 + 24, buffer, Font_7x10,ST7735_BLACK, ST7735_WHITE);
+            break;
+        
+        case DISPLAY_PASSWORD_ADMIN:
+            msg_len = 10;
+            strncpy(buffer, "N PASS[A]:",msg_len);
+            while (digits--)
+            {
+                buffer[msg_len++] = '*';
+            }
+            buffer[msg_len] = '\0';
+            ST7735_WriteString(0, 2*26 + 4 + 24, buffer, Font_7x10, ST7735_BLACK, ST7735_WHITE);
+            break;
 
+        case DISPLAY_PASSWORD_USER:
+            msg_len = 7;
+            strncpy(buffer, "N PASS:",msg_len);
+            while (digits--)
+            {
+                buffer[msg_len++] = '*';
+            }
+            buffer[msg_len] = '\0';
+            ST7735_WriteString(0, 2*26 + 4 + 24, buffer, Font_7x10, ST7735_BLACK, ST7735_WHITE);
+            break;
+
+        default:
+            break;
+    }
 }
 
 void clear_info_section(void)
