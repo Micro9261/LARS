@@ -5,7 +5,6 @@
 
 #define MAX_LEN 16
 
-static volatile uint16_t tick_cnt = 0;
 static uint8_t cardstr[17] = {0};
 
 
@@ -21,8 +20,17 @@ static void spi_slave_deselect(void)
 
 static void delay_ms(uint16_t ms)
 {
-    tick_cnt = 0;
-    while (tick_cnt < ms);
+    //SysTick config
+    SysTick->LOAD = 16000 - 1;
+    SysTick->VAL = 0;
+    SysTick->CTRL = (1UL << SysTick_CTRL_CLKSOURCE_Pos) | (1UL << SysTick_CTRL_ENABLE_Pos);
+
+    for (uint16_t i = 0; i < ms; i++)
+    {
+        while ( !(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) );
+    }
+
+    SysTick->CTRL = 0;
 }
 
 static void write_register(uint8_t reg, uint8_t val)
@@ -125,16 +133,6 @@ void mfrc522_init()
     GPIOB->MODER |= GPIO_MODER_MODE9_0;
 
     spi_slave_deselect();
-
-    //TIM2 clock enable
-    RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
-
-    //TIM2 configuration 1ms tick
-    TIM2->PSC = 16000 - 1; // Prescaler for 1MHz timer clock
-    TIM2->ARR = 1000 - 1; // Auto-reload for 1ms tick
-    TIM2->CR1 |= TIM_CR1_CEN; // Enable TIM2
-
-    NVIC_EnableIRQ(TIM2_IRQn); // Enable TIM2 interrupt
 
     //MFRC522 Reset
     if ( (GPIOB->IDR & GPIO_IDR_ID2) == 0 ) // If reset pin is low, set it high
@@ -496,15 +494,6 @@ uint8_t mfrc522_halt(void)
 void mfrc522_stop_crypto1(void)
 {
     clear_bit_mask(MFRC522_STATUS2_REG, 0x08);
-}
-
-void TIM2_IRQHandler(void)
-{
-    if (TIM2->SR & TIM_SR_UIF) // Check for update interrupt
-    {
-        TIM2->SR &= ~TIM_SR_UIF; // Clear interrupt flag
-        tick_cnt++; // Increment tick counter
-    }
 }
 
 uint8_t mfrc522_card_present(void)

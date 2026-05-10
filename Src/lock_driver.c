@@ -1,15 +1,36 @@
 #include "lock_driver.h"
+#include "stm32f446xx.h"
 
 static lock_status_t lock_status = LOCK_STATUS_CLOSED;
 
+// static void delay_ms(uint16_t ms)
+// {
+//     //SysTick config
+//     SysTick->LOAD = 16000 - 1;
+//     SysTick->VAL = 0;
+//     SysTick->CTRL = (1UL << SysTick_CTRL_CLKSOURCE_Pos) | (1UL << SysTick_CTRL_ENABLE_Pos);
+
+//     for (uint16_t i = 0; i < ms; i++)
+//     {
+//         while ( !(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) );
+//     }
+
+//     SysTick->CTRL = 0;
+// }
+
 void lock_init()
 {
-    //GPIOA clock enable
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+    //GPIOA and GPIOC clock enable
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOCEN;
 
     //PA5 as output
     GPIOA->MODER |= GPIO_MODER_MODER5_0;
     GPIOA->BSRR = GPIO_BSRR_BR5; // Set PA5 low (lock closed)
+
+    //PC13 as input
+    GPIOC->MODER &= ~GPIO_MODER_MODER13_Msk;
+    GPIOC->PUPDR &= ~GPIO_PUPDR_PUPD13_Msk;
+    GPIOC->PUPDR |= GPIO_PUPDR_PUPD13_0;
 
     lock_status = LOCK_STATUS_CLOSED;
 }
@@ -27,7 +48,8 @@ void lock_close()
 {
     if (lock_status == LOCK_STATUS_BLOCKED)
         return; // Cannot close if blocked
-
+    
+    while (GPIOC->IDR & GPIO_IDR_ID13); //wait until doors opened
     GPIOA->BSRR = GPIO_BSRR_BR5; // Set PA5 low (lock closed)
     lock_status = LOCK_STATUS_CLOSED;
 }

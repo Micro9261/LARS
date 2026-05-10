@@ -132,7 +132,8 @@ void TIM6_DAC_IRQHandler(void)
         col = (col + 1) % 4; // Move to next column
         uint8_t mask = ~( 1UL << col ) << 4; // Create mask to set current column low
         uint8_t value = ( GPIOC->ODR & (~0xF0)) | ( mask & 0xF0 ); // Shift low column to the next one
-        GPIOC->ODR = value;
+        GPIOC->ODR &= ~(0xF0);
+        GPIOC->ODR |= value;
 
         for (uint8_t row = 0; row < 4; row++)
         {

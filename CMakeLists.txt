@@ -48,6 +48,9 @@ set(sources_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/lock_driver.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/mfrc522_driver.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Src/password_manager.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/led_driver.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/lcd_driver.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Src/fonts.c
     ${CMAKE_CURRENT_SOURCE_DIR}/CMSIS/Device/ST/STM32F4xx/Source/Templates/system_stm32f4xx.c
 )
 
