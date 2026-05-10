@@ -53,6 +53,7 @@ void user_menu(void);
 #define DISPLAY_CARD_BAD 4
 #define DISPLAY_PASSWORD_SAVED 5
 #define DISPLAY_PASSWORD_ERR 6
+#define DISPLAY_PASSWORD_BAD 7
 
 #define DISPLAY_PASSWORD_GUESS 0
 #define DISPLAY_PASSWORD_ADMIN 1
@@ -108,6 +109,12 @@ int main(void)
                 {
                     user_menu();
                 }
+                else 
+                {
+                    display_notification(DISPLAY_PASSWORD_BAD);
+                    delay_ms(1000);
+                    clear_info_section();
+                }
             }
         }
 
@@ -129,6 +136,12 @@ int main(void)
                 else if (pass_manager_check_card(uid, uid_len, UID_TYPE_USER) == CARD_OK)
                 {
                     user_menu();
+                }
+                else
+                {
+                    display_notification(DISPLAY_CARD_BAD);
+                    delay_ms(1000);
+                    clear_info_section();
                 }
             }
         }
@@ -551,6 +564,10 @@ void display_notification(uint8_t type)
 
         case DISPLAY_PASSWORD_ERR:
             ST7735_WriteString(0, 2*26 + 4 + 24, "PASS error!", Font_7x10, ST7735_BLACK, ST7735_WHITE);
+            break;
+
+        case DISPLAY_PASSWORD_BAD:
+            ST7735_WriteString(0, 2*26 + 4 + 24, "PASS wrong!", Font_7x10, ST7735_BLACK, ST7735_WHITE);
             break;
 
         default:
