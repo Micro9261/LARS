@@ -3,21 +3,6 @@
 
 static lock_status_t lock_status = LOCK_STATUS_CLOSED;
 
-// static void delay_ms(uint16_t ms)
-// {
-//     //SysTick config
-//     SysTick->LOAD = 16000 - 1;
-//     SysTick->VAL = 0;
-//     SysTick->CTRL = (1UL << SysTick_CTRL_CLKSOURCE_Pos) | (1UL << SysTick_CTRL_ENABLE_Pos);
-
-//     for (uint16_t i = 0; i < ms; i++)
-//     {
-//         while ( !(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) );
-//     }
-
-//     SysTick->CTRL = 0;
-// }
-
 void lock_init()
 {
     //GPIOA and GPIOC clock enable

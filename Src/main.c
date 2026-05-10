@@ -22,14 +22,16 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "MFRC522.h"
-#include "stm32f446xx.h"
+#include "fonts.h"
 #include "system_stm32f4xx.h"
 #include "usart_driver.h"
 #include "keyboard_driver.h"
 #include "lock_driver.h"
 #include "mfrc522_driver.h"
 #include "password_manager.h"
+#include "lcd_driver.h"
+#include "led_driver.h"
+
 
 #define MAX_CHECKS 10
 
@@ -43,6 +45,25 @@ void change_password(uint8_t type);
 void admin_menu(void);
 void user_menu(void);
 
+//display functions
+#define DISPLAY_CARD_SCAN 0
+#define DISPLAY_CARD_ADDED 1
+#define DISPLAY_CARD_REMOVED 2
+#define DISPLAY_CARD_ERR 3
+#define DISPLAY_CARD_BAD 4
+
+#define DISPLAY_PASSWORD_GUESS 0
+#define DISPLAY_PASSWORD_ADMIN 1
+#define DISPLAY_PASSWORD_USER 2
+
+void display_logo(void);
+void display_lock_status(uint8_t open);
+void display_admin_mode(uint8_t admin);
+void display_blocked(uint8_t blocked);
+void display_card_notification(uint8_t type);
+void display_password(uint8_t digits, uint8_t type);
+void clear_info_section(void);
+
 
 int main(void)
 {
@@ -54,11 +75,14 @@ int main(void)
     keyboard_init();
     mfrc522_init();
     pass_manager_init();
+    lock_init();
+    led_init();
 
     char buffer[50];
     sprintf(buffer, "MFRC522 Version: 0x%02X\r\n", mfrc522_version());
     uint8_t msg_num = strlen(buffer);
     USART2_Send(buffer, msg_num);
+    ST7735_FillScreen(ST7735_WHITE);
     while(1)
     {
         if (!keyboard_empty())
@@ -358,4 +382,62 @@ void user_menu(void)
     msg = "User actions end!\r\n";
     msg_len = strlen(msg);
     USART2_Send(msg, msg_len);
+}
+
+void display_logo(void)
+{
+    ST7735_WriteString(16, 0, "SECURITY", Font_16x26, ST7735_BLUE, ST7735_WHITE);
+    ST7735_WriteString(48, 26, "LOCK", Font_16x26, ST7735_BLUE, ST7735_WHITE);
+}
+
+void display_lock_status(uint8_t open)
+{
+    ST7735_FillRectangle(47, 2*26 + 4, 52 + 6* 11, 2*26 + 4 + 18, uint16_t color);
+    if (open == true)
+    {
+        ST7735_WriteString(47 + 11, 2*26 + 4, "OPEN", Font_11x18, ST7735_GREEN, ST7735_WHITE);
+    }
+    else
+    {
+        ST7735_WriteString(47, 2*26 + 4, "CLOSED", Font_11x18, ST7735_RED, ST7735_WHITE);
+    }
+}
+
+void display_admin_mode(uint8_t admin)
+{
+    if (admin == true)
+    {
+        ST7735_WriteString(0, 2*26, "A", Font_16x26, ST7735_MAGENTA, ST7735_WHITE);
+    }
+    else
+    {
+        ST7735_WriteString(0, 2*26, " ", Font_16x26, ST7735_MAGENTA, ST7735_WHITE);
+    }
+}
+
+void display_blocked(uint8_t blocked)
+{
+    if (blocked == true)
+    {
+        ST7735_WriteString(160 - 27, 2*26, "B", Font_16x26, ST7735_RED, ST7735_WHITE);
+    }
+    else
+    {
+        ST7735_WriteString(160 - 27, 2*26, " ", Font_16x26, ST7735_MAGENTA, ST7735_WHITE);
+    }
+}
+
+void display_card_notification(uint8_t type)
+{
+    
+}
+
+void display_password(uint8_t digits, uint8_t type)
+{
+
+}
+
+void clear_info_section(void)
+{
+    ST7735_FillRectangle(0, 2*26 + 4 + 24, ST7735_WIDTH, ST7735_HEIGHT, ST7735_WHITE);
 }
